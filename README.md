@@ -18,7 +18,7 @@
 - **公開**: GitHub Pages
 - **フロントエンド**: **HTML, CSS, JavaScript**
 - **PDF処理ライブラリ**: **PDF-lib.js** (PDFの結合・分割機能) および **PDF.js** (PDFのプレビュー機能)
-<!-- - **Google Drive連携**: **Google Identity Services ライブラリ**を使用して、Google Drive APIへのアクセスを実装します。 -->
+- **Google Drive連携**: **Google Identity Services ライブラリ**を使用して、Google Drive APIへのアクセスを実装します。
 
 ---
 
@@ -28,17 +28,8 @@
 - `script.js`: PDFの処理ロジック、Google Drive連携、UIイベント処理など、アプリの核心となるJavaScriptコードです。
 - `lib/`: 外部ライブラリを配置するディレクトリ。ここに `pdf-lib.min.js` と `pdf.min.js` を格納します。
 
-
+<!-- 
 ### to Do
 必須機能の実装
-<!-- Google Drive連携の実装 📍
-Google Cloud PlatformでAPIキーとクライアントIDを取得する。
-取得したキーをscript.tsに設定する。
-google-drive-pickerボタンがクリックされた際に、Googleの認証フローを開始し、ファイルピッカーを表示するロジックを実装する。
-ピッカーで選択されたファイルをダウンロードし、handleFiles関数に渡す処理を記述する。 -->
 
-GitHub Pagesへの公開 🚀
-
-開発が完了したコードをGitHubリポジトリにプッシュする。
-リポジトリの Settings > Pages から、main（またはmaster）ブランチをソースとして選択し、サイトを公開する。
-
+GitHub Pagesで公開 🚀 -->
