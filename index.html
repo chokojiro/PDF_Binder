@@ -73,15 +73,15 @@
     </main>
 
     <footer>
-        <p>&copy; 2025  tsato.he@minebeamitsumi.com</p>
+        <p>&copy; 2025  さとうともひろ</p>
     </footer>
 
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://apis.google.com/js/api.js"></script>
     <script src="lib/pdf-lib.min.js"></script>
-    <!-- <script src="lib/Sortable.js"></script> -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
-    <script src="script.js" defer></script>
+    <script src="script.js"></script> 
+
+    <script src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script src="https://accounts.google.com/gsi/client" onload="gisLoaded()" async defer></script>
 </body>
 </html>
