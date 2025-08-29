@@ -10,6 +10,13 @@ const splitFilenameInput = document.getElementById('split-filename');
 
 let pdfFiles = [];
 
+const API_KEY = 'AIzaSyCeLM9Qmzf-AMRWV82hE2Hou5hBZH2MFVk';
+const CLIENT_ID = '143351699813-5odg6ndgdel9m3hm8dibnup40b5nfmr6.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+let tokenClient;
+let gapiInited = false;
+let gisInited = false;
+
 dropArea.addEventListener('dragover', (e) => {
     e.preventDefault();
     dropArea.classList.add('active');
@@ -42,17 +49,55 @@ async function handleFiles(files) {
                 const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
                 pdfFiles.push({ name: file.name, doc: pdfDoc });
             } catch (error) {
-                console.error('PDFファイルの読み込みに失敗しました:', file.name, error);
-                alert(`「${file.name}」の読み込みに失敗しました。ファイルが破損している可能性があります。`);
+                console.error('PDF Read Error:', file.name, error);
+                alert(`Error reading file "${file.name}". The file may be corrupt.`);
             }
         }
     }
     renderFileList();
 }
 
-// TODO: Google Drive連携を実装
+function gapiLoaded() {
+    gapi.load('client:picker', initializeGapiClient);
+}
+
+async function initializeGapiClient() {
+    await gapi.client.init({
+        apiKey: API_KEY,
+        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+    });
+    gapiInited = true;
+}
+
+function gisLoaded() {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: '',
+    });
+    gisInited = true;
+}
+
+window.gapiLoaded = gapiLoaded;
+window.gisLoaded = gisLoaded;
+
 googleDrivePicker.addEventListener('click', () => {
-    alert('Google Drive連携は未実装です。');
+    if (!gapiInited || !gisInited) {
+        alert('Google API is not ready. Please try again in a moment.');
+        return;
+    }
+    tokenClient.callback = async (resp) => {
+        if (resp.error !== undefined) {
+            console.error('Authentication error:', resp.error);
+            throw (resp);
+        }
+        createPicker();
+    };
+    if (gapi.client.getToken() === null) {
+        tokenClient.requestAccessToken({ prompt: 'consent' });
+    } else {
+        tokenClient.requestAccessToken({ prompt: '' });
+    }
 });
 
 Sortable.create(fileListElement, {
@@ -64,15 +109,51 @@ Sortable.create(fileListElement, {
     },
 });
 
+function createPicker() {
+    const view = new google.picker.View(google.picker.ViewId.DOCS);
+    view.setMimeTypes("application/pdf");
+    const picker = new google.picker.PickerBuilder()
+        .enableFeature(google.picker.Feature.NAV_HIDDEN)
+        .setAppId(CLIENT_ID.split('-')[0])
+        .setOAuthToken(gapi.client.getToken().access_token)
+        .addView(view)
+        .setCallback(pickerCallback)
+        .build();
+    picker.setVisible(true);
+}
+
+async function pickerCallback(data) {
+    if (data.action === google.picker.Action.PICKED) {
+        for (const doc of data.docs) {
+            try {
+                const fileId = doc.id;
+                const res = await gapi.client.drive.files.get({
+                    fileId: fileId,
+                    alt: 'media',
+                });
+                const fileContent = res.body;
+                const binaryData = new Uint8Array(fileContent.length);
+                for (let i = 0; i < fileContent.length; i++) {
+                    binaryData[i] = fileContent.charCodeAt(i);
+                }
+                const file = new File([binaryData.buffer], doc.name, { type: doc.mimeType });
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                await handleFiles(dataTransfer.files);
+            } catch (err) {
+                console.error('Failed to retrieve or process file from Google Drive:', err);
+                alert('Failed to retrieve or process the file.');
+            }
+        }
+    }
+}
+
 function renderFileList() {
     fileListElement.innerHTML = '';
     pdfFiles.forEach((file) => {
         const item = document.createElement('div');
         item.className = 'file-item';
-        item.innerHTML = `
-            <span class="name">${file.name}</span>
-            <button class="remove-button">x</button>
-        `;
+        item.innerHTML = `<span class="name">${file.name}</span><button class="remove-button">x</button>`;
         fileListElement.appendChild(item);
     });
     updateFileItemIndices();
@@ -105,16 +186,18 @@ function updateButtonState() {
     splitRangeInput.disabled = fileCount !== 1;
 }
 
-mergeButton.addEventListener('click', async () => {
-    setBusyState(mergeButton, '結合中...');
-    try {
-        // フォームからファイル名を取得、空ならデフォルト値を使用
-        let filename = mergeFilenameInput.value.trim() || 'merged.pdf';
-        // 末尾に .pdf がなければ追加
-        if (!filename.toLowerCase().endsWith('.pdf')) {
-            filename += '.pdf';
-        }
+function getFilenameFromInput(inputElement, defaultName) {
+    let filename = inputElement.value.trim() || defaultName;
+    if (!filename.toLowerCase().endsWith('.pdf')) {
+        filename += '.pdf';
+    }
+    return filename;
+}
 
+mergeButton.addEventListener('click', async () => {
+    setBusyState(mergeButton, 'Merging...');
+    try {
+        const filename = getFilenameFromInput(mergeFilenameInput, 'merged.pdf');
         const mergedPdf = await PDFLib.PDFDocument.create();
         for (const file of pdfFiles) {
             const copiedPages = await mergedPdf.copyPages(file.doc, file.doc.getPageIndices());
@@ -122,53 +205,44 @@ mergeButton.addEventListener('click', async () => {
         }
         const pdfBytes = await mergedPdf.save();
         downloadFile(pdfBytes, filename, 'application/pdf');
-
     } catch (error) {
-        console.error('PDFの結合に失敗しました:', error);
-        alert('PDFの結合中にエラーが発生しました。');
+        console.error('PDF Merge Error:', error);
+        alert('An error occurred while merging the PDFs.');
     } finally {
-        resetButtonState(mergeButton, '結合を実行');
+        resetButtonState(mergeButton, 'Merge Files');
     }
 });
 
-// script.js
 splitButton.addEventListener('click', async () => {
     const rangeText = splitRangeInput.value.trim();
     if (!rangeText) {
-        alert('ページ範囲を入力してください (例: 1-3, 5, 8-10)');
+        alert('Please enter a page range (e.g., 1-3, 5, 8-10).');
         return;
     }
-    setBusyState(splitButton, '分割中...');
+    setBusyState(splitButton, 'Splitting...');
     try {
         const sourcePdf = pdfFiles[0];
-        
-        // フォームからファイル名を取得、空なら元のファイル名ベースのデフォルト値
-        let filename = splitFilenameInput.value.trim() || `split_${sourcePdf.name}`;
-        // 末尾に .pdf がなければ追加
-        if (!filename.toLowerCase().endsWith('.pdf')) {
-            filename += '.pdf';
-        }
-
+        const defaultName = `split_${sourcePdf.name}`;
+        const filename = getFilenameFromInput(splitFilenameInput, defaultName);
         const totalPages = sourcePdf.doc.getPageCount();
         const pageIndices = parsePageRange(rangeText, totalPages);
         if (pageIndices.length === 0) {
-            alert('有効なページ番号が指定されていません。');
+            alert('No valid pages were specified.');
             return;
         }
         const newPdf = await PDFLib.PDFDocument.create();
         const copiedPages = await newPdf.copyPages(sourcePdf.doc, pageIndices);
         copiedPages.forEach(page => newPdf.addPage(page));
         const pdfBytes = await newPdf.save();
-        
         downloadFile(pdfBytes, filename, 'application/pdf');
-
     } catch (error) {
-        console.error('PDFの分割に失敗しました:', error);
-        alert(`PDFの分割中にエラーが発生しました: ${error.message}`);
+        console.error('PDF Split Error:', error);
+        alert(`An error occurred while splitting the PDF: ${error.message}`);
     } finally {
-        resetButtonState(splitButton, '分割を実行');
+        resetButtonState(splitButton, 'Split File');
     }
 });
+
 function parsePageRange(rangeText, maxPage) {
     const indices = new Set();
     rangeText.split(',').forEach(part => {
