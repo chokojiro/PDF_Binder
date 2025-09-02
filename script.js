@@ -10,8 +10,7 @@ const splitFilenameInput = document.getElementById('split-filename');
 
 let pdfFiles = [];
 
-const API_KEY = 'AIzaSyCeLM9Qmzf-AMRWV82hE2Hou5hBZH2MFVk';
-const CLIENT_ID = '143351699813-5odg6ndgdel9m3hm8dibnup40b5nfmr6.apps.googleusercontent.com';
+
 const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 let tokenClient;
 let gapiInited = false;
@@ -287,3 +286,4 @@ function downloadFile(data, filename, mimeType) {
 }
 
 updateButtonState();
+
