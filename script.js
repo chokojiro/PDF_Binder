@@ -111,8 +111,10 @@ Sortable.create(fileListElement, {
 function createPicker() {
     const view = new google.picker.View(google.picker.ViewId.DOCS);
     view.setMimeTypes("application/pdf");
+
     const picker = new google.picker.PickerBuilder()
         .enableFeature(google.picker.Feature.NAV_HIDDEN)
+        .enableFeature(google.picker.Feature.MULTISELECT_ENABLED) // Add this line
         .setAppId(CLIENT_ID.split('-')[0])
         .setOAuthToken(gapi.client.getToken().access_token)
         .addView(view)
